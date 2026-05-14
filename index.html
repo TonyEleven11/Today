@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Today" />
+<meta name="theme-color" content="#0b0b0f" />
+<title>Today</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%230b0b0f'/><text x='50%25' y='58%25' font-family='-apple-system,system-ui' font-size='100' font-weight='700' fill='%23ffffff' text-anchor='middle'>T</text></svg>" />
+<style>
+  :root {
+    --bg: #0b0b0f;
+    --surface: #16171d;
+    --surface-2: #1d1f27;
+    --border: #2a2d38;
+    --text: #f4f5f8;
+    --muted: #8c8fa0;
+    --accent: #6f8cff;
+    --accent-soft: rgba(111, 140, 255, 0.18);
+    --done: #4ade80;
+    --danger: #ef6f7a;
+    --radius: 14px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: contain;
+  }
+
+  body {
+    min-height: 100vh;
+    padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 96px);
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  header.day {
+    margin-bottom: 18px;
+  }
+  .date-label {
+    color: var(--muted);
+    font-size: 14px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .date-big {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 14px 6px;
+    margin-bottom: 16px;
+  }
+  section h2 {
+    margin: 0 0 10px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  section h2 .count {
+    background: var(--surface-2);
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 4px;
+    border-top: 1px solid var(--border);
+  }
+  .item:first-of-type { border-top: 0; }
+
+  /* Appointments */
+  .appt-time {
+    min-width: 64px;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    font-size: 15px;
+    padding-top: 1px;
+  }
+  .appt-body {
+    flex: 1;
+    min-width: 0;
+  }
+  .appt-title {
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+  .appt-meta {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 2px;
+  }
+
+  /* Tasks */
+  .task-check {
+    flex: 0 0 22px;
+    height: 22px;
+    width: 22px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    margin-top: 2px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .task-check.done {
+    background: var(--done);
+    border-color: var(--done);
+  }
+  .task-check.done::after {
+    content: "";
+    width: 6px;
+    height: 11px;
+    border: solid #0b0b0f;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+  }
+  .task-body { flex: 1; min-width: 0; }
+  .task-title { overflow-wrap: anywhere; }
+  .task-title.done { color: var(--muted); text-decoration: line-through; }
+  .task-meta {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 2px;
+  }
+
+  .delete-btn {
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    font-size: 18px;
+    line-height: 1;
+    padding: 4px 6px;
+    cursor: pointer;
+  }
+  .delete-btn:active { color: var(--danger); }
+
+  .empty {
+    color: var(--muted);
+    font-size: 14px;
+    padding: 6px 4px 12px;
+  }
+
+  /* Add button */
+  .fab {
+    position: fixed;
+    right: 20px;
+    bottom: calc(var(--safe-bottom) + 24px);
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    border: 0;
+    padding: 0;
+    box-shadow: 0 8px 24px rgba(111, 140, 255, 0.35);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    z-index: 50;
+  }
+  .fab svg { width: 22px; height: 22px; display: block; }
+  .fab:active { transform: scale(0.96); }
+
+  /* Filter pills (above tasks list) */
+  .filter-row {
+    display: flex;
+    gap: 6px;
+    margin: 0 0 10px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .filter-pill {
+    flex: 0 0 auto;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    user-select: none;
+  }
+  .filter-pill.active {
+    background: var(--accent-soft);
+    color: var(--text);
+    border-color: var(--accent);
+  }
+
+  /* Sheet (add form) */
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 100;
+  }
+  .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+
+  .sheet {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: var(--surface);
+    border-radius: 18px 18px 0 0;
+    padding: 18px 18px calc(var(--safe-bottom) + 18px);
+    transform: translateY(100%);
+    transition: transform 0.25s ease-out;
+    z-index: 110;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  .sheet.open { transform: translateY(0); }
+  .sheet h3 {
+    margin: 0 0 12px;
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .tabs {
+    display: flex;
+    background: var(--surface-2);
+    border-radius: 10px;
+    padding: 3px;
+    margin-bottom: 14px;
+  }
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 8px;
+    font-size: 14px;
+    color: var(--muted);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .tab.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+
+  label.field {
+    display: block;
+    margin-bottom: 10px;
+  }
+  label.field span {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  input[type="text"], input[type="time"], input[type="date"], textarea {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 11px 12px;
+    font-size: 16px;
+    font-family: inherit;
+  }
+  textarea { resize: none; min-height: 60px; }
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .row { display: flex; gap: 10px; }
+  .row label.field { flex: 1; }
+
+  /* Date chip row (task scheduling) */
+  .chip-row {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    margin: 0 -2px;
+  }
+  .chip-row::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    text-align: center;
+    line-height: 1.2;
+    user-select: none;
+  }
+  .chip .chip-sub {
+    display: block;
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-top: 1px;
+    letter-spacing: 0.02em;
+  }
+  .chip.active {
+    background: var(--accent-soft);
+    color: var(--text);
+    border-color: var(--accent);
+  }
+  .chip.active .chip-sub { color: var(--accent); }
+
+  .sheet-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: 0;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-secondary {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn:active { transform: scale(0.98); }
+
+</style>
+</head>
+<body>
+  <header class="day">
+    <div class="date-label" id="dayName">—</div>
+    <div class="date-big" id="dateBig">—</div>
+  </header>
+
+  <section id="apptSection">
+    <h2>Appointments <span class="count" id="apptCount">0</span></h2>
+    <div id="apptList"></div>
+  </section>
+
+  <section id="taskSection">
+    <h2>Tasks <span class="count" id="taskCount">0</span></h2>
+    <div class="filter-row" id="taskFilterRow">
+      <div class="filter-pill active" data-filter="all">All</div>
+      <div class="filter-pill" data-filter="phone-calls">Phone calls</div>
+      <div class="filter-pill" data-filter="five-minutes">5 minutes</div>
+    </div>
+    <div id="taskList"></div>
+  </section>
+
+  <button class="fab" id="addBtn" aria-label="Add">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  </button>
+
+  <div class="sheet-backdrop" id="backdrop"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true">
+    <h3>Add to today</h3>
+    <div class="tabs">
+      <div class="tab active" data-type="task" id="tabTask">Task</div>
+      <div class="tab" data-type="appt" id="tabAppt">Appointment</div>
+    </div>
+
+    <div id="taskForm">
+      <label class="field">
+        <span>Task</span>
+        <input type="text" id="taskInput" placeholder="What needs doing?" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span>When</span>
+        <div class="chip-row" id="taskWhenChips"></div>
+      </label>
+      <label class="field">
+        <span>Category</span>
+        <div class="chip-row" id="taskCategoryChips">
+          <div class="chip active" data-category="">None</div>
+          <div class="chip" data-category="phone-calls">Phone calls</div>
+          <div class="chip" data-category="five-minutes">5 minutes</div>
+        </div>
+      </label>
+    </div>
+
+    <div id="apptForm" style="display:none">
+      <label class="field">
+        <span>Title</span>
+        <input type="text" id="apptTitle" placeholder="What's the appointment?" autocomplete="off" />
+      </label>
+      <div class="row">
+        <label class="field">
+          <span>Start</span>
+          <input type="time" id="apptStart" />
+        </label>
+        <label class="field">
+          <span>End (optional)</span>
+          <input type="time" id="apptEnd" />
+        </label>
+      </div>
+      <label class="field">
+        <span>Where (optional)</span>
+        <input type="text" id="apptWhere" placeholder="Location or link" autocomplete="off" />
+      </label>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-secondary" id="cancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="saveBtn">Add</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const STORAGE_KEY = "tony_today_v1";
+
+  // ----- State -----
+  // Tasks persist until completed and a new day rolls over.
+  // Appointments are date-stamped — we only show today's.
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { tasks: [], appointments: [], lastSeenDate: todayStr() };
+      const s = JSON.parse(raw);
+      s.tasks ||= [];
+      s.appointments ||= [];
+      s.lastSeenDate ||= todayStr();
+      return s;
+    } catch (_) {
+      return { tasks: [], appointments: [], lastSeenDate: todayStr() };
+    }
+  }
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function todayStr() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  function uid() {
+    return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  }
+
+  function addDaysStr(dateStr, days) {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + days);
+    const yy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, "0");
+    const dd = String(dt.getDate()).padStart(2, "0");
+    return `${yy}-${mm}-${dd}`;
+  }
+
+  const state = loadState();
+
+  // Daily rollover: drop appointments from past dates; drop completed tasks from previous days.
+  function rolloverIfNeeded() {
+    const today = todayStr();
+    if (state.lastSeenDate !== today) {
+      state.appointments = state.appointments.filter(a => a.date >= today);
+      state.tasks = state.tasks.filter(t => !t.done);
+      state.lastSeenDate = today;
+      saveState();
+    }
+  }
+  rolloverIfNeeded();
+
+  // ----- Render -----
+  const $ = (id) => document.getElementById(id);
+
+  function renderHeader() {
+    const d = new Date();
+    const dayName = d.toLocaleDateString(undefined, { weekday: "long" });
+    const dateBig = d.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+    $("dayName").textContent = dayName;
+    $("dateBig").textContent = dateBig;
+  }
+
+  function formatTime(t) {
+    if (!t) return "";
+    const [h, m] = t.split(":").map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+
+  function renderAppointments() {
+    const today = todayStr();
+    const list = state.appointments
+      .filter(a => a.date === today)
+      .sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+    $("apptCount").textContent = list.length;
+    const container = $("apptList");
+    container.innerHTML = "";
+    if (list.length === 0) {
+      const e = document.createElement("div");
+      e.className = "empty";
+      e.textContent = "Nothing on the calendar today.";
+      container.appendChild(e);
+      return;
+    }
+    for (const a of list) {
+      const row = document.createElement("div");
+      row.className = "item";
+
+      const time = document.createElement("div");
+      time.className = "appt-time";
+      const tStr = a.start ? formatTime(a.start) : "—";
+      const tEnd = a.end ? "–" + formatTime(a.end) : "";
+      time.textContent = tStr + (tEnd ? "\n" + tEnd : "");
+      time.style.whiteSpace = "pre-line";
+
+      const body = document.createElement("div");
+      body.className = "appt-body";
+      const title = document.createElement("div");
+      title.className = "appt-title";
+      title.textContent = a.title;
+      body.appendChild(title);
+      if (a.where) {
+        const meta = document.createElement("div");
+        meta.className = "appt-meta";
+        meta.textContent = a.where;
+        body.appendChild(meta);
+      }
+
+      const del = document.createElement("button");
+      del.className = "delete-btn";
+      del.setAttribute("aria-label", "Delete");
+      del.innerHTML = "&times;";
+      del.onclick = () => {
+        state.appointments = state.appointments.filter(x => x.id !== a.id);
+        saveState();
+        renderAppointments();
+      };
+
+      row.append(time, body, del);
+      container.appendChild(row);
+    }
+  }
+
+  function renderTasks() {
+    const today = todayStr();
+    // Hide tasks scheduled for a future date — they'll appear on their day.
+    // Tasks with no dueDate (legacy) or dueDate <= today are visible.
+    const visible = state.tasks
+      .filter(t => !t.dueDate || t.dueDate <= today)
+      .sort((a, b) => Number(a.done) - Number(b.done) || a.createdAt - b.createdAt);
+    // Apply category filter (in-memory, resets on reload)
+    const list = activeFilter === "all"
+      ? visible
+      : visible.filter(t => (t.category || "") === activeFilter);
+    const remaining = list.filter(t => !t.done).length;
+    $("taskCount").textContent = remaining;
+    const container = $("taskList");
+    container.innerHTML = "";
+    if (list.length === 0) {
+      const e = document.createElement("div");
+      e.className = "empty";
+      if (activeFilter === "all") {
+        e.textContent = "No tasks yet. Tap + to add one.";
+      } else if (activeFilter === "phone-calls") {
+        e.textContent = "No phone calls today.";
+      } else if (activeFilter === "five-minutes") {
+        e.textContent = "No 5-minute tasks today.";
+      }
+      container.appendChild(e);
+      return;
+    }
+    for (const t of list) {
+      const row = document.createElement("div");
+      row.className = "item";
+
+      const chk = document.createElement("div");
+      chk.className = "task-check" + (t.done ? " done" : "");
+      chk.setAttribute("role", "checkbox");
+      chk.setAttribute("aria-checked", String(!!t.done));
+      chk.onclick = () => {
+        t.done = !t.done;
+        saveState();
+        renderTasks();
+      };
+
+      const body = document.createElement("div");
+      body.className = "task-body";
+      const title = document.createElement("div");
+      title.className = "task-title" + (t.done ? " done" : "");
+      title.textContent = t.title;
+      body.appendChild(title);
+      if (t.note) {
+        const meta = document.createElement("div");
+        meta.className = "task-meta";
+        meta.textContent = t.note;
+        body.appendChild(meta);
+      }
+
+      const del = document.createElement("button");
+      del.className = "delete-btn";
+      del.setAttribute("aria-label", "Delete");
+      del.innerHTML = "&times;";
+      del.onclick = () => {
+        state.tasks = state.tasks.filter(x => x.id !== t.id);
+        saveState();
+        renderTasks();
+      };
+
+      row.append(chk, body, del);
+      container.appendChild(row);
+    }
+  }
+
+  function renderAll() {
+    renderHeader();
+    renderAppointments();
+    renderTasks();
+  }
+
+  // ----- Add sheet -----
+  let mode = "task";
+  let selectedDueDate = todayStr(); // for the task form's date chips
+  let selectedCategory = "";        // for the task form's category chips
+  let activeFilter = "all";         // home-screen filter — resets to "all" on reload
+  const sheet = $("sheet");
+  const backdrop = $("backdrop");
+
+  // Wire up filter pills
+  document.querySelectorAll("#taskFilterRow .filter-pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+      activeFilter = pill.dataset.filter;
+      document.querySelectorAll("#taskFilterRow .filter-pill")
+        .forEach(p => p.classList.toggle("active", p === pill));
+      renderTasks();
+    });
+  });
+
+  // Wire up category chips inside the add-task sheet
+  document.querySelectorAll("#taskCategoryChips .chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      selectedCategory = chip.dataset.category;
+      document.querySelectorAll("#taskCategoryChips .chip")
+        .forEach(c => c.classList.toggle("active", c === chip));
+    });
+  });
+
+  function buildDateChips() {
+    const container = $("taskWhenChips");
+    container.innerHTML = "";
+    const today = todayStr();
+    selectedDueDate = today;
+    const weekdayShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    for (let i = 0; i <= 7; i++) {
+      const dateStr = addDaysStr(today, i);
+      const [y, m, d] = dateStr.split("-").map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      const chip = document.createElement("div");
+      chip.className = "chip" + (i === 0 ? " active" : "");
+      chip.dataset.date = dateStr;
+      let label;
+      if (i === 0) label = "Today";
+      else if (i === 1) label = "Tomorrow";
+      else label = weekdayShort[dateObj.getDay()];
+      const sub = i === 0 || i === 1 ? weekdayShort[dateObj.getDay()] : `${dateObj.getDate()} ${dateObj.toLocaleDateString(undefined, { month: "short" })}`;
+      chip.innerHTML = `<span>${label}</span><span class="chip-sub">${sub}</span>`;
+      chip.onclick = () => {
+        selectedDueDate = dateStr;
+        container.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", c === chip));
+      };
+      container.appendChild(chip);
+    }
+  }
+
+  function openSheet(initialMode = "task") {
+    buildDateChips();
+    setMode(initialMode);
+    sheet.classList.add("open");
+    backdrop.classList.add("open");
+    setTimeout(() => {
+      (mode === "task" ? $("taskInput") : $("apptTitle")).focus();
+    }, 220);
+  }
+  function closeSheet() {
+    sheet.classList.remove("open");
+    backdrop.classList.remove("open");
+    clearForm();
+  }
+  function clearForm() {
+    $("taskInput").value = "";
+    $("apptTitle").value = "";
+    $("apptStart").value = "";
+    $("apptEnd").value = "";
+    $("apptWhere").value = "";
+    selectedDueDate = todayStr();
+    // Reset category chips back to "None"
+    selectedCategory = "";
+    document.querySelectorAll("#taskCategoryChips .chip").forEach(c => {
+      c.classList.toggle("active", c.dataset.category === "");
+    });
+  }
+  function setMode(m) {
+    mode = m;
+    $("tabTask").classList.toggle("active", m === "task");
+    $("tabAppt").classList.toggle("active", m === "appt");
+    $("taskForm").style.display = m === "task" ? "" : "none";
+    $("apptForm").style.display = m === "appt" ? "" : "none";
+  }
+
+  $("addBtn").onclick = () => openSheet("task");
+  $("cancelBtn").onclick = closeSheet;
+  backdrop.onclick = closeSheet;
+  $("tabTask").onclick = () => setMode("task");
+  $("tabAppt").onclick = () => setMode("appt");
+
+  $("saveBtn").onclick = () => {
+    if (mode === "task") {
+      const title = $("taskInput").value.trim();
+      if (!title) return;
+      state.tasks.push({
+        id: uid(),
+        title,
+        category: selectedCategory,
+        done: false,
+        dueDate: selectedDueDate,
+        createdAt: Date.now(),
+      });
+    } else {
+      const title = $("apptTitle").value.trim();
+      if (!title) return;
+      state.appointments.push({
+        id: uid(),
+        title,
+        date: todayStr(),
+        start: $("apptStart").value || "",
+        end: $("apptEnd").value || "",
+        where: $("apptWhere").value.trim(),
+      });
+    }
+    saveState();
+    renderAll();
+    closeSheet();
+  };
+
+  // Re-render when app comes back to foreground (handles date rollover).
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      rolloverIfNeeded();
+      renderAll();
+    }
+  });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
