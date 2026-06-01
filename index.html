@@ -374,6 +374,36 @@
   }
   .btn:active { transform: scale(0.98); }
 
+  /* Upcoming peek (footer of the tasks section) */
+  .upcoming-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 4px 10px;
+    margin-top: 4px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .upcoming-toggle:active { opacity: 0.7; }
+  .upcoming-chev {
+    font-size: 14px;
+    margin-left: 8px;
+    line-height: 1;
+  }
+  .upcoming-day-header {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    padding: 10px 4px 4px;
+    margin-top: 4px;
+  }
+  .upcoming-item { opacity: 0.7; }
+  .upcoming-item .task-title { font-weight: 400; }
+  .upcoming-day-header + .upcoming-item { border-top: 0; }
 </style>
 </head>
 <body>
@@ -395,6 +425,7 @@
       <div class="filter-pill" data-filter="five-minutes">5 minutes</div>
     </div>
     <div id="taskList"></div>
+    <div id="upcomingFooter"></div>
   </section>
 
   <button class="fab" id="addBtn" aria-label="Add">
@@ -729,6 +760,116 @@
       row.append(chk, body, del);
       container.appendChild(row);
     }
+    renderUpcoming();
+  }
+
+  // The peek footer of the tasks section: a muted "X scheduled later this week"
+  // line that, when tapped, expands inline to show future-dated tasks grouped
+  // by day. Tasks here are view-only (no checkbox, no × button) — long-press
+  // to edit, same as today's list. Category filter is intentionally NOT applied
+  // to the peek so future work is never silently hidden behind a filter.
+  function renderUpcoming() {
+    const footer = $("upcomingFooter");
+    footer.innerHTML = "";
+    const today = todayStr();
+    const upcoming = state.tasks
+      .filter(t => t.dueDate && t.dueDate > today && !t.done)
+      .sort((a, b) =>
+        a.dueDate.localeCompare(b.dueDate) ||
+        (a.order ?? a.createdAt) - (b.order ?? b.createdAt)
+      );
+    if (upcoming.length === 0) {
+      upcomingExpanded = false;
+      return;
+    }
+
+    const toggle = document.createElement("div");
+    toggle.className = "upcoming-toggle";
+    const n = upcoming.length;
+    const label = `${n} scheduled later this week`;
+    toggle.innerHTML = `<span>${label}</span><span class="upcoming-chev">${upcomingExpanded ? "▾" : "›"}</span>`;
+    toggle.onclick = () => {
+      upcomingExpanded = !upcomingExpanded;
+      renderUpcoming();
+    };
+    footer.appendChild(toggle);
+
+    if (!upcomingExpanded) return;
+
+    // Group by dueDate and render with day headers
+    const groups = new Map();
+    for (const t of upcoming) {
+      if (!groups.has(t.dueDate)) groups.set(t.dueDate, []);
+      groups.get(t.dueDate).push(t);
+    }
+    const weekdayShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const [ty, tm, td] = today.split("-").map(Number);
+    const todayDate = new Date(ty, tm - 1, td);
+
+    for (const [dateStr, tasks] of groups) {
+      const [y, m, d] = dateStr.split("-").map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      const daysOut = Math.round((dateObj - todayDate) / 86400000);
+
+      const header = document.createElement("div");
+      header.className = "upcoming-day-header";
+      header.textContent = daysOut === 1
+        ? "Tomorrow"
+        : `${weekdayShort[dateObj.getDay()]} · ${dateObj.getDate()} ${dateObj.toLocaleDateString(undefined, { month: "short" })}`;
+      footer.appendChild(header);
+
+      for (const t of tasks) {
+        const row = document.createElement("div");
+        row.className = "item upcoming-item";
+
+        const body = document.createElement("div");
+        body.className = "task-body";
+        const title = document.createElement("div");
+        title.className = "task-title";
+        title.textContent = t.title;
+        body.appendChild(title);
+        if (t.category) {
+          const cat = document.createElement("div");
+          cat.className = "task-meta";
+          cat.textContent = t.category === "phone-calls" ? "Phone calls"
+            : t.category === "five-minutes" ? "5 minutes"
+            : t.category;
+          body.appendChild(cat);
+        }
+        row.appendChild(body);
+
+        // Long-press to edit (matches today's task rows but without checkbox/delete)
+        let pressTimer = null;
+        let pressMoved = false;
+        let mouseSuppressUntil = 0;
+        const startPress = (e) => {
+          if (e.type === 'mousedown' && Date.now() < mouseSuppressUntil) return;
+          pressMoved = false;
+          if (pressTimer) clearTimeout(pressTimer);
+          pressTimer = setTimeout(() => {
+            pressTimer = null;
+            if (!pressMoved) openSheetForEdit(t);
+          }, 500);
+        };
+        const endPress = (e) => {
+          if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+          if (e && e.type === 'touchend') mouseSuppressUntil = Date.now() + 600;
+        };
+        const cancelPress = () => {
+          if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+        };
+        const movedPress = () => { pressMoved = true; cancelPress(); };
+        row.addEventListener('touchstart', startPress, { passive: true });
+        row.addEventListener('touchend', endPress);
+        row.addEventListener('touchcancel', cancelPress);
+        row.addEventListener('touchmove', movedPress, { passive: true });
+        row.addEventListener('mousedown', startPress);
+        row.addEventListener('mouseup', endPress);
+        row.addEventListener('mouseleave', cancelPress);
+
+        footer.appendChild(row);
+      }
+    }
   }
 
   function renderAll() {
@@ -743,6 +884,7 @@
   let selectedCategory = "";        // for the task form's category chips
   let activeFilter = "all";         // home-screen filter — resets to "all" on reload
   let editingTaskId = null;         // when set, the sheet is editing this task instead of adding
+  let upcomingExpanded = false;     // peek of future-dated tasks — resets to collapsed on reload
   const sheet = $("sheet");
   const backdrop = $("backdrop");
 
